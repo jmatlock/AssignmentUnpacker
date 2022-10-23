@@ -81,8 +81,10 @@ def main():
                         help='zip file from Blackboard')
     parser.add_argument('-f', '--feedback', metavar='feedback-filename',
                         nargs='?', type=str, help='use feedback template')
-    parser.add_argument('-p', '--prefix', action='store_true',
-                        help='prefix on created folder')
+    parser.add_argument('-np', '--noprefix', action='store_true',
+                        help='no section name prefix on created folder')
+    parser.add_argument('-px', '--postfix',
+                        help='add postfix to created folder')
 
     args = parser.parse_args()
 
@@ -99,9 +101,14 @@ def main():
             feedback_template =  feedback_file.read()
 
     prefix = ''
-    if args.prefix:
+    if not args.noprefix:
         # prefix = args.prefix + '-'
         prefix = args.infile.split('_')[1].split('.')[3] + '-'
+
+    postfix = ''
+    if args.postfix:
+        # prefix = args.prefix + '-'
+        postfix = '-' + args.postfix
 
     assignment = None
     student_list = []
@@ -117,7 +124,7 @@ def main():
         if len(files) > 0:
             fname = files[0].filename
             assignment = fname.split('_')[0]
-            group_dir = prefix + assignment
+            group_dir = prefix + assignment + postfix
             # If directory already exists, move it to a backup
             if os.path.exists(group_dir):
                 os.rename(group_dir, group_dir+'-backup')
