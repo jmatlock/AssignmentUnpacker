@@ -21,7 +21,6 @@ each student directory. Otherwise, a blank feedback.txt file is created.
 """
 
 # Features under consideration
-# TODO: Add to version control
 # TODO: Create a GUI interface
 # TODO: Add an option for just getting updated submissions from a zip
 # TODO: Add incorrect file name flagging
@@ -157,8 +156,10 @@ def main():
     student_file_name = 'students-' + assignment.replace(' ', '') + '.txt'
     counter = 0
     with open(student_file_name, 'w') as student_file:
-        student_file.write(f'{assignment}\n')
-        student_file.write((len(assignment) * '-') + '\n')
+        prefix = prefix.rstrip('-')
+        header = assignment + ' - ' + prefix
+        student_file.write(f'{header}\n')
+        student_file.write((len(header) * '-') + '\n')
         student_list.sort()
         for student in student_list:
             if counter % 10 == 0 and counter != 0:
