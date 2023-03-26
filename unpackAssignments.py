@@ -30,6 +30,7 @@ import argparse
 import os
 from string import Template
 from zipfile import ZipFile
+from datetime import datetime
 
 
 def copy_feedback_file(student, feedback, feedback_filename):
@@ -72,6 +73,12 @@ def process_zipfile(destdir, zipfile):
             # print(f'In {z.filename}: {info.filename}')
 
 
+def get_dt_submitted(student, timestamp_dict):
+    timestamp = timestamp_dict[student]
+    dt_timestamp = datetime.strptime(timestamp, '%Y-%m-%d-%H-%M-%S')
+    return dt_timestamp.strftime('%a %b %d, %I:%M %p')
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Unpack submissions from Blackboard gradebook zip file '
@@ -111,6 +118,7 @@ def main():
 
     assignment = None
     student_list = []
+    timestamp_dict = {}
     # Currently this dictionary is unused, but I'm keeping it
     # in place in case it is useful for additional features.
     # This dictionary will be populated with { studentid : [file1, ...], ...}
@@ -136,6 +144,7 @@ def main():
             timestamp = parts[3]
             if parts[1] not in student_list:
                 student_list.append(student)
+                timestamp_dict[student] = timestamp
                 os.makedirs(student)
                 student_files[student] = []
             bb_zip.extract(file, student)
@@ -164,7 +173,7 @@ def main():
         for student in student_list:
             if counter % 10 == 0 and counter != 0:
                 student_file.write('-\n')
-            student_file.write(f'{student}\n')
+            student_file.write(f'{get_dt_submitted(student, timestamp_dict)}: {student}\n')
             counter += 1
 
     print(f'Assignment: {assignment}')
