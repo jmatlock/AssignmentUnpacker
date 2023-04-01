@@ -48,9 +48,11 @@ def copy_feedback_file(student, feedback, feedback_filename):
     if feedback:  # Feedback file was supplied, copy it
         # Substitute $student_name in template
         feedback_template = Template(feedback)
-        updated_template = feedback_template.substitute(student_name=student_name)
+        updated_template = feedback_template.substitute(
+            student_name=student_name)
         # Write file
-        with open(f'{student}/{student}-{feedback_filename}', 'w') as custom_feedback:
+        with open(f'{student}/{student}-{feedback_filename}',
+                  'w') as custom_feedback:
             custom_feedback.write(updated_template)
     else:  # No supplied feedback file, creating one customized for student
         title_string = f'==  Feedback for {student_name}  =='
@@ -76,6 +78,11 @@ def process_zipfile(destdir, zipfile):
 def get_dt_submitted(student, timestamp_dict):
     timestamp = timestamp_dict[student]
     dt_timestamp = datetime.strptime(timestamp, '%Y-%m-%d-%H-%M-%S')
+    return dt_timestamp
+
+
+def get_dt_submitted_str(student, timestamp_dict):
+    dt_timestamp = get_dt_submitted(student, timestamp_dict)
     return dt_timestamp.strftime('%a %b %d, %I:%M %p')
 
 
@@ -91,20 +98,22 @@ def main():
                         help='no section name prefix on created folder')
     parser.add_argument('-px', '--postfix',
                         help='add postfix to created folder')
+    parser.add_argument('-eg', '--earlygrade',
+                        help='add postfix "EG" to students who submit before date (mm-dd-yyyy)')
 
     args = parser.parse_args()
 
-    if not(os.path.isfile(args.infile)):
+    if not (os.path.isfile(args.infile)):
         print(f'File not found: {args.infile}')
         exit(1)
-    elif args.feedback and not(os.path.isfile(args.feedback)):
+    elif args.feedback and not (os.path.isfile(args.feedback)):
         print(f'File not found: {args.feedback}')
         exit(1)
 
     feedback_template = None
     if args.feedback:
         with open(args.feedback, 'r') as feedback_file:
-            feedback_template =  feedback_file.read()
+            feedback_template = feedback_file.read()
 
     prefix = ''
     if not args.noprefix:
@@ -114,6 +123,17 @@ def main():
     postfix = ''
     if args.postfix:
         # prefix = args.prefix + '-'
+        postfix = '-' + args.postfix
+
+    earlygrade = None
+    if args.earlygrade:
+        try:
+            earlygrade = datetime.strptime(args.earlygrade, '%m-%d-%Y')
+        except ValueError:
+            print(f'Could not parse provided date {args.earlygrade}')
+            print('Format expected: mm-dd-yyyy')
+            exit(-1)
+        args.postfix = 'EG'
         postfix = '-' + args.postfix
 
     assignment = None
@@ -134,7 +154,7 @@ def main():
             group_dir = prefix + assignment + postfix
             # If directory already exists, move it to a backup
             if os.path.exists(group_dir):
-                os.rename(group_dir, group_dir+'-backup')
+                os.rename(group_dir, group_dir + '-backup')
             os.makedirs(group_dir)
             os.chdir(group_dir)
         for file in files:
@@ -148,15 +168,17 @@ def main():
                 os.makedirs(student)
                 student_files[student] = []
             bb_zip.extract(file, student)
-            new_fname = fname.replace(assignment+'_'+student+'_attempt_'+timestamp+'_', '')
+            new_fname = fname.replace(
+                assignment + '_' + student + '_attempt_' + timestamp + '_', '')
             if new_fname == '.txt':
                 new_fname = 'attempt_' + timestamp + new_fname
-            os.rename(student+'/'+fname, student+'/'+new_fname)
+            os.rename(student + '/' + fname, student + '/' + new_fname)
             student_files[student].append(new_fname)
             # print(f'Student: {student}, file: {new_fname}')
             if new_fname[-4:] == '.zip':  # Zip file inside original zip file
-                process_zipfile(student+'/'+new_fname[:-4], student+'/'+new_fname)
-                os.remove(student+'/'+new_fname)  # Remove inner zip
+                process_zipfile(student + '/' + new_fname[:-4],
+                                student + '/' + new_fname)
+                os.remove(student + '/' + new_fname)  # Remove inner zip
             file_count += 1
     for student in student_list:
         copy_feedback_file(student, feedback_template, args.feedback)
@@ -173,7 +195,14 @@ def main():
         for student in student_list:
             if counter % 10 == 0 and counter != 0:
                 student_file.write('-\n')
-            student_file.write(f'{get_dt_submitted(student, timestamp_dict)}: {student}\n')
+            if earlygrade:
+                if earlygrade > get_dt_submitted(student, timestamp_dict):
+                    student_file.write(f'{student} (EG)\n')
+                else:
+                    student_file.write(f'{student}\n')
+            else:
+                student_file.write(
+                    f'{get_dt_submitted_str(student, timestamp_dict)}: {student}\n')
             counter += 1
 
     print(f'Assignment: {assignment}')
