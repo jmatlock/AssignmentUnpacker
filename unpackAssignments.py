@@ -100,6 +100,8 @@ def main():
                         help='add postfix to created folder')
     parser.add_argument('-eg', '--earlygrade',
                         help='add postfix "EG" to students who submit before date (mm-dd-yyyy)')
+    parser.add_argument('-af', '--after',
+                        help='only get assignments submitted after date-time (mm-dd-yyyy-hh-mm)')
 
     args = parser.parse_args()
 
@@ -136,6 +138,15 @@ def main():
         args.postfix = 'EG'
         postfix = '-' + args.postfix
 
+    after = None
+    if args.after:
+        try:
+            after = datetime.strptime(args.after, '%m-%d-%Y-%H-%M')
+        except ValueError:
+            print(f'Could not parse provided date-time {args.after}')
+            print('Format expected: mm-dd-yyyy-hh-mm (24 hour time)')
+            exit(-1)
+
     assignment = None
     student_list = []
     timestamp_dict = {}
@@ -162,6 +173,15 @@ def main():
             parts = fname.split('_')
             student = parts[1]
             timestamp = parts[3]
+            # print(timestamp)
+            if timestamp.endswith('.txt'):
+                timestamp_dt = datetime.strptime(timestamp,
+                                                 '%Y-%m-%d-%H-%M-%S.txt')
+            else:
+                timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%d-%H-%M-%S')
+            # If after is set, skip assignments submitted before that date-time
+            if after and after > timestamp_dt:
+                continue
             if parts[1] not in student_list:
                 student_list.append(student)
                 timestamp_dict[student] = timestamp
@@ -187,8 +207,10 @@ def main():
     student_file_name = 'students-' + assignment.replace(' ', '') + '.txt'
     counter = 0
     with open(student_file_name, 'w') as student_file:
+        current_dt = datetime.now()
         prefix = prefix.rstrip('-')
-        header = assignment + ' - ' + prefix
+        header = assignment + ' - ' + prefix \
+                 + f' ({current_dt.strftime("%m-%d-%Y-%H-%M")})'
         student_file.write(f'{header}\n')
         student_file.write((len(header) * '-') + '\n')
         student_list.sort()
