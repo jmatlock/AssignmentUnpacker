@@ -71,7 +71,10 @@ def process_zipfile(destdir, zipfile):
             if '.idea' in info.filename or 'venv' in info.filename \
                     or '__MACOSX' in info.filename:
                 continue
-            z.extract(info, path=destdir)
+            try:
+                z.extract(info, path=destdir)
+            except Exception as e:
+                print(f'[{destdir} {info}]: Error: {e}')
             # print(f'In {z.filename}: {info.filename}')
 
 
@@ -171,8 +174,14 @@ def main():
         for file in files:
             fname = file.filename
             parts = fname.split('_')
-            student = parts[1]
-            timestamp = parts[3]
+            # print(parts)  # DONE: REMOVE THIS!
+            pivot = parts.index('attempt')
+            if pivot != -1:
+                student = parts[pivot-1]
+                timestamp = parts[pivot+1]
+            else:
+                print(f'Weird filename: {fname}')
+                continue
             # print(timestamp)
             if timestamp.endswith('.txt'):
                 timestamp_dt = datetime.strptime(timestamp,
@@ -182,7 +191,7 @@ def main():
             # If after is set, skip assignments submitted before that date-time
             if after and after > timestamp_dt:
                 continue
-            if parts[1] not in student_list:
+            if student not in student_list:
                 student_list.append(student)
                 timestamp_dict[student] = timestamp
                 os.makedirs(student)
@@ -223,8 +232,12 @@ def main():
                 else:
                     student_file.write(f'{student}\n')
             else:
-                student_file.write(
-                    f'{get_dt_submitted_str(student, timestamp_dict)}: {student}\n')
+                try:
+                    student_file.write(
+                        f'{get_dt_submitted_str(student, timestamp_dict)}: {student}\n')
+                except ValueError:
+                    student_file.write(
+                        f'XXX XXX XX, XX:XX XX: {student}\n')
             counter += 1
 
     print(f'Assignment: {assignment}')
