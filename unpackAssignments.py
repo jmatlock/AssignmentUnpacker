@@ -64,6 +64,8 @@ def copy_feedback_file(student, feedback, feedback_filename):
 
 def process_zipfile(destdir, zipfile):
     # print(f'Zipfile found for {destdir}: {zipfile}')
+
+    processed = True  # Indicates the zip file was successfully unzipped
     with ZipFile(zipfile) as z:
         infolist = z.infolist()
         for info in infolist:
@@ -75,7 +77,9 @@ def process_zipfile(destdir, zipfile):
                 z.extract(info, path=destdir)
             except Exception as e:
                 print(f'[{destdir} {info}]: Error: {e}')
+                processed = False
             # print(f'In {z.filename}: {info.filename}')
+    return processed
 
 
 def get_dt_submitted(student, timestamp_dict):
@@ -205,9 +209,10 @@ def main():
             student_files[student].append(new_fname)
             # print(f'Student: {student}, file: {new_fname}')
             if new_fname[-4:] == '.zip':  # Zip file inside original zip file
-                process_zipfile(student + '/' + new_fname[:-4],
+                processed = process_zipfile(student + '/' + new_fname[:-4],
                                 student + '/' + new_fname)
-                os.remove(student + '/' + new_fname)  # Remove inner zip
+                if processed:
+                    os.remove(student + '/' + new_fname)  # Remove inner zip
             file_count += 1
     for student in student_list:
         copy_feedback_file(student, feedback_template, args.feedback)
