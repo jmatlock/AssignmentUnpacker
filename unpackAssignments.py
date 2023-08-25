@@ -93,6 +93,17 @@ def get_dt_submitted_str(student, timestamp_dict):
     return dt_timestamp.strftime('%a %b %d, %I:%M %p')
 
 
+def get_all_students(roster_file):
+    student_list = []
+    with open(roster_file, 'r') as rf:
+        for student_id in rf:
+            student_id = student_id.strip('\n')
+            if student_id:
+                student_list.append(student_id)
+    student_list.sort()
+    return student_list
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Unpack submissions from Blackboard gradebook zip file '
@@ -109,6 +120,8 @@ def main():
                         help='add postfix "EG" to students who submit before date (mm-dd-yyyy)')
     parser.add_argument('-af', '--after',
                         help='only get assignments submitted after date-time (mm-dd-yyyy-hh-mm)')
+    parser.add_argument('-sr', '--studentroster',
+                        help='text file of all student ids')
 
     args = parser.parse_args()
 
@@ -219,6 +232,11 @@ def main():
 
     # Create text file with students who submitted assignment
     student_file_name = 'students-' + assignment.replace(' ', '') + '.txt'
+    if args.studentroster:
+        sr_filename = os.path.join('..', args.studentroster)
+        all_student_list = get_all_students(sr_filename)
+    else:
+        all_student_list = []
     counter = 0
     with open(student_file_name, 'w') as student_file:
         current_dt = datetime.now()
@@ -243,7 +261,15 @@ def main():
                 except ValueError:
                     student_file.write(
                         f'XXX XXX XX, XX:XX XX: {student}\n')
+            if student in all_student_list:
+                all_student_list.remove(student)
             counter += 1
+
+        if len(all_student_list) > 0:
+            student_file.write(f'\n\nStudents without assignment:{len(all_student_list):4}\n')
+            student_file.write('--------------------------------\n')
+            for student in all_student_list:
+                student_file.write(f'{student}\n')
 
     print(f'Assignment: {assignment}')
     print(f"{file_count} files extracted for {len(student_list)} students")
