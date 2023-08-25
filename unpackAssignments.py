@@ -181,8 +181,22 @@ def main():
         # first get assignment name and create directory
         if len(files) > 0:
             fname = files[0].filename
-            assignment = fname.split('_')[0]
-            group_dir = prefix + assignment + postfix
+            parts = fname.split('_')
+            # The word "attempt" is a pivot point in the BB file name
+            # The format is assignment_student_attempt_timestamp_filename
+            pivot = parts.index('attempt')
+            # The assignment CAN have an underscore, so we have to account
+            # for that situation.
+            if pivot != -1:
+                assignment = fname.split('_')[:pivot-1]
+                if len(assignment) > 1:
+                    assignment = '_'.join(assignment)
+                else:
+                    assignment = assignment[0]
+                group_dir = prefix + assignment + postfix
+            else:
+                print(f'File format not supported: {fname}')
+                exit(-1)
             # If directory already exists, move it to a backup
             if os.path.exists(group_dir):
                 os.rename(group_dir, group_dir + '-backup')
@@ -191,7 +205,6 @@ def main():
         for file in files:
             fname = file.filename
             parts = fname.split('_')
-            # print(parts)  # DONE: REMOVE THIS!
             pivot = parts.index('attempt')
             if pivot != -1:
                 student = parts[pivot-1]
