@@ -63,22 +63,27 @@ def copy_feedback_file(student, feedback, feedback_filename):
 
 
 def process_zipfile(destdir, zipfile):
-    # print(f'Zipfile found for {destdir}: {zipfile}')
+    print(f'Zipfile found for {destdir}: {zipfile}')
 
     processed = True  # Indicates the zip file was successfully unzipped
-    with ZipFile(zipfile) as z:
-        infolist = z.infolist()
-        for info in infolist:
-            # Exclude directories which don't include student files
-            if '.idea' in info.filename or 'venv' in info.filename \
-                    or '__MACOSX' in info.filename:
-                continue
-            try:
-                z.extract(info, path=destdir)
-            except Exception as e:
-                print(f'[{destdir} {info}]: Error: {e}')
-                processed = False
-            # print(f'In {z.filename}: {info.filename}')
+    try:
+        with ZipFile(zipfile) as z:
+            infolist = z.infolist()
+            for info in infolist:
+                # Exclude directories which don't include student files
+                if '.idea' in info.filename or 'venv' in info.filename \
+                        or '__MACOSX' in info.filename:
+                    continue
+                try:
+                    z.extract(info, path=destdir)
+                except Exception as e:
+                    print(f'[{destdir} {info}]: Error: {e}')
+                    processed = False
+                # print(f'In {z.filename}: {info.filename}')
+    except Exception as err:
+        print(f'\t{err} Zip file could not be processed: {zipfile}')
+        processed = False
+
     return processed
 
 
@@ -98,7 +103,7 @@ def get_all_students(roster_file):
     with open(roster_file, 'r') as rf:
         for student_id in rf:
             student_id = student_id.strip('\n')
-            if student_id:
+            if student_id and not student_id.startswith('#'):
                 student_list.append(student_id)
     student_list.sort()
     return student_list
@@ -231,7 +236,17 @@ def main():
                 assignment + '_' + student + '_attempt_' + timestamp + '_', '')
             if new_fname == '.txt':
                 new_fname = 'attempt_' + timestamp + new_fname
-            os.rename(student + '/' + fname, student + '/' + new_fname)
+            try:
+                os.rename(student + '/' + fname, student + '/' + new_fname)
+            except FileExistsError:
+                if not os.path.exists(student + '/' + timestamp):
+                    os.mkdir(student + '/' + timestamp)
+                    timestamp_dict[student] = timestamp
+                    print(f'Additional attempt for {student}: {timestamp}')
+                try:
+                    os.rename(student + '/' + fname, student + '/' + timestamp + '/' + new_fname)
+                except FileExistsError:
+                    print(f'ATTENTION REQUIRED: {student}: {timestamp}')
             student_files[student].append(new_fname)
             # print(f'Student: {student}, file: {new_fname}')
             if new_fname[-4:] == '.zip':  # Zip file inside original zip file
@@ -241,7 +256,10 @@ def main():
                     os.remove(student + '/' + new_fname)  # Remove inner zip
             file_count += 1
     for student in student_list:
-        copy_feedback_file(student, feedback_template, args.feedback)
+        try:
+            copy_feedback_file(student, feedback_template, args.feedback)
+        except Exception as err:
+            print(f'\t{err}: \n\tCould not copy feedback for {student}')
 
     # Create text file with students who submitted assignment
     student_file_name = 'students-' + assignment.replace(' ', '') + '.txt'
