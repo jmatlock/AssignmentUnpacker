@@ -35,53 +35,66 @@ from datetime import datetime
 
 def copy_feedback_file(student, feedback, feedback_filename):
     # Get student name from attempt file
-    student_filelist = os.listdir(f'{student}')
-    attempt_filename = ''
+    student_filelist = os.listdir(f"{student}")
+    attempt_filename = ""
     for filename in student_filelist:
-        if filename.find('attempt') != -1:
-            attempt_filename = os.path.join(f'{student}', f'{filename}')
+        if filename.find("attempt") != -1:
+            attempt_filename = os.path.join(f"{student}", f"{filename}")
             break
-    student_name = ''
-    with open(attempt_filename, 'r') as attempt_file:
+    student_name = ""
+    with open(attempt_filename, "r") as attempt_file:
         name_line = attempt_file.readline().strip()
-        student_name = name_line.replace('Name: ', '')
+        student_name = name_line.replace("Name: ", "")
     if feedback:  # Feedback file was supplied, copy it
         # Substitute $student_name in template
         feedback_template = Template(feedback)
-        updated_template = feedback_template.substitute(
-            student_name=student_name)
+        updated_template = feedback_template.substitute(student_name=student_name)
         # Write file
-        with open(f'{student}/{student}-{feedback_filename}',
-                  'w') as custom_feedback:
+        with open(f"{student}/{student}-{feedback_filename}", "w") as custom_feedback:
             custom_feedback.write(updated_template)
     else:  # No supplied feedback file, creating one customized for student
-        title_string = f'==  Feedback for {student_name}  =='
-        with open(f'{student}/feedback.txt', 'a') as f:
-            f.write('=' * len(title_string) + '\n')
-            f.write(title_string + '\n')
-            f.write('=' * len(title_string) + '\n')
+        title_string = f"==  Feedback for {student_name}  =="
+        with open(f"{student}/feedback.txt", "a") as f:
+            f.write("=" * len(title_string) + "\n")
+            f.write(title_string + "\n")
+            f.write("=" * len(title_string) + "\n")
 
 
 def process_zipfile(destdir, zipfile):
-    print(f'Zipfile found for {destdir}: {zipfile}')
-
+    print(f"Zipfile found for {destdir}: {zipfile}")
     processed = True  # Indicates the zip file was successfully unzipped
     try:
         with ZipFile(zipfile) as z:
             infolist = z.infolist()
+            idea_found = False
+            venv_found = False
             for info in infolist:
                 # Exclude directories which don't include student files
-                if '.idea' in info.filename or 'venv' in info.filename \
-                        or '__MACOSX' in info.filename:
+                if (
+                    ".idea" in info.filename
+                    or "venv" in info.filename
+                    or "__MACOSX" in info.filename
+                    or "lib/" in info.filename
+                ):
+                    # print(f'Skipping {info.filename}')
+                    if ".idea" in info.filename and not idea_found:
+                        print(f"Skipping {info.filename}")
+                        idea_found = True
+                    elif ".venv" in info.filename and not venv_found:
+                        print(f"Skipping {info.filename}")
+                        venv_found = True
+                    continue
+                elif ".mp4" in info.filename or ".webm" in info.filename:
+                    print(f"Skipping {info.filename}")
                     continue
                 try:
                     z.extract(info, path=destdir)
                 except Exception as e:
-                    print(f'[{destdir} {info}]: Error: {e}')
+                    print(f"[{destdir} {info}]: Error: {e}")
                     processed = False
                 # print(f'In {z.filename}: {info.filename}')
     except Exception as err:
-        print(f'\t{err} Zip file could not be processed: {zipfile}')
+        print(f"\t{err} Zip file could not be processed: {zipfile}")
         processed = False
 
     return processed
@@ -89,21 +102,21 @@ def process_zipfile(destdir, zipfile):
 
 def get_dt_submitted(student, timestamp_dict):
     timestamp = timestamp_dict[student]
-    dt_timestamp = datetime.strptime(timestamp, '%Y-%m-%d-%H-%M-%S')
+    dt_timestamp = datetime.strptime(timestamp, "%Y-%m-%d-%H-%M-%S")
     return dt_timestamp
 
 
 def get_dt_submitted_str(student, timestamp_dict):
     dt_timestamp = get_dt_submitted(student, timestamp_dict)
-    return dt_timestamp.strftime('%a %b %d, %I:%M %p')
+    return dt_timestamp.strftime("%a %b %d, %I:%M %p")
 
 
 def get_all_students(roster_file):
     student_list = []
-    with open(roster_file, 'r') as rf:
+    with open(roster_file, "r") as rf:
         for student_id in rf:
-            student_id = student_id.strip('\n')
-            if student_id and not student_id.startswith('#'):
+            student_id = student_id.strip("\n")
+            if student_id and not student_id.startswith("#"):
                 student_list.append(student_id)
     student_list.sort()
     return student_list
@@ -111,65 +124,81 @@ def get_all_students(roster_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Unpack submissions from Blackboard gradebook zip file '
-                    'and provide feedback file')
-    parser.add_argument('infile', metavar='zip-filename',
-                        help='zip file from Blackboard')
-    parser.add_argument('-f', '--feedback', metavar='feedback-filename',
-                        nargs='?', type=str, help='use feedback template')
-    parser.add_argument('-np', '--noprefix', action='store_true',
-                        help='no section name prefix on created folder')
-    parser.add_argument('-px', '--postfix',
-                        help='add postfix to created folder')
-    parser.add_argument('-eg', '--earlygrade',
-                        help='add postfix "EG" to students who submit before date (mm-dd-yyyy)')
-    parser.add_argument('-af', '--after',
-                        help='only get assignments submitted after date-time (mm-dd-yyyy-hh-mm)')
-    parser.add_argument('-sr', '--studentroster',
-                        help='text file of all student ids')
+        description="Unpack submissions from Blackboard gradebook zip file "
+        "and provide feedback file"
+    )
+    parser.add_argument(
+        "infile", metavar="zip-filename", help="zip file from Blackboard"
+    )
+    parser.add_argument(
+        "-f",
+        "--feedback",
+        metavar="feedback-filename",
+        nargs="?",
+        type=str,
+        help="use feedback template",
+    )
+    parser.add_argument(
+        "-np",
+        "--noprefix",
+        action="store_true",
+        help="no section name prefix on created folder",
+    )
+    parser.add_argument("-px", "--postfix", help="add postfix to created folder")
+    parser.add_argument(
+        "-eg",
+        "--earlygrade",
+        help='add postfix "EG" to students who submit before date (mm-dd-yyyy)',
+    )
+    parser.add_argument(
+        "-af",
+        "--after",
+        help="only get assignments submitted after date-time (mm-dd-yyyy-hh-mm)",
+    )
+    parser.add_argument("-sr", "--studentroster", help="text file of all student ids")
 
     args = parser.parse_args()
 
     if not (os.path.isfile(args.infile)):
-        print(f'File not found: {args.infile}')
+        print(f"File not found: {args.infile}")
         exit(1)
     elif args.feedback and not (os.path.isfile(args.feedback)):
-        print(f'File not found: {args.feedback}')
+        print(f"File not found: {args.feedback}")
         exit(1)
 
     feedback_template = None
     if args.feedback:
-        with open(args.feedback, 'r') as feedback_file:
+        with open(args.feedback, "r") as feedback_file:
             feedback_template = feedback_file.read()
 
-    prefix = ''
+    prefix = ""
     if not args.noprefix:
         # prefix = args.prefix + '-'
-        prefix = args.infile.split('_')[1].split('.')[3] + '-'
+        prefix = args.infile.split("_")[1].split(".")[3] + "-"
 
-    postfix = ''
+    postfix = ""
     if args.postfix:
         # prefix = args.prefix + '-'
-        postfix = '-' + args.postfix
+        postfix = "-" + args.postfix
 
     earlygrade = None
     if args.earlygrade:
         try:
-            earlygrade = datetime.strptime(args.earlygrade, '%m-%d-%Y')
+            earlygrade = datetime.strptime(args.earlygrade, "%m-%d-%Y")
         except ValueError:
-            print(f'Could not parse provided date {args.earlygrade}')
-            print('Format expected: mm-dd-yyyy')
+            print(f"Could not parse provided date {args.earlygrade}")
+            print("Format expected: mm-dd-yyyy")
             exit(-1)
-        args.postfix = 'EG'
-        postfix = '-' + args.postfix
+        args.postfix = "EG"
+        postfix = "-" + args.postfix
 
     after = None
     if args.after:
         try:
-            after = datetime.strptime(args.after, '%m-%d-%Y-%H-%M')
+            after = datetime.strptime(args.after, "%m-%d-%Y-%H-%M")
         except ValueError:
-            print(f'Could not parse provided date-time {args.after}')
-            print('Format expected: mm-dd-yyyy-hh-mm (24 hour time)')
+            print(f"Could not parse provided date-time {args.after}")
+            print("Format expected: mm-dd-yyyy-hh-mm (24 hour time)")
             exit(-1)
 
     assignment = None
@@ -186,43 +215,42 @@ def main():
         # first get assignment name and create directory
         if len(files) > 0:
             fname = files[0].filename
-            parts = fname.split('_')
+            parts = fname.split("_")
             # The word "attempt" is a pivot point in the BB file name
             # The format is assignment_student_attempt_timestamp_filename
-            pivot = parts.index('attempt')
+            pivot = parts.index("attempt")
             # The assignment CAN have an underscore, so we have to account
             # for that situation.
             if pivot != -1:
-                assignment = fname.split('_')[:pivot-1]
+                assignment = fname.split("_")[: pivot - 1]
                 if len(assignment) > 1:
-                    assignment = '_'.join(assignment)
+                    assignment = "_".join(assignment)
                 else:
                     assignment = assignment[0]
                 group_dir = prefix + assignment + postfix
             else:
-                print(f'File format not supported: {fname}')
+                print(f"File format not supported: {fname}")
                 exit(-1)
             # If directory already exists, move it to a backup
             if os.path.exists(group_dir):
-                os.rename(group_dir, group_dir + '-backup')
+                os.rename(group_dir, group_dir + "-backup")
             os.makedirs(group_dir)
             os.chdir(group_dir)
         for file in files:
             fname = file.filename
-            parts = fname.split('_')
-            pivot = parts.index('attempt')
+            parts = fname.split("_")
+            pivot = parts.index("attempt")
             if pivot != -1:
-                student = parts[pivot-1]
-                timestamp = parts[pivot+1]
+                student = parts[pivot - 1]
+                timestamp = parts[pivot + 1]
             else:
-                print(f'Weird filename: {fname}')
+                print(f"Weird filename: {fname}")
                 continue
             # print(timestamp)
-            if timestamp.endswith('.txt'):
-                timestamp_dt = datetime.strptime(timestamp,
-                                                 '%Y-%m-%d-%H-%M-%S.txt')
+            if timestamp.endswith(".txt"):
+                timestamp_dt = datetime.strptime(timestamp, "%Y-%m-%d-%H-%M-%S.txt")
             else:
-                timestamp_dt = datetime.strptime(timestamp, '%Y-%m-%d-%H-%M-%S')
+                timestamp_dt = datetime.strptime(timestamp, "%Y-%m-%d-%H-%M-%S")
             # If after is set, skip assignments submitted before that date-time
             if after and after > timestamp_dt:
                 continue
@@ -233,78 +261,86 @@ def main():
                 student_files[student] = []
             bb_zip.extract(file, student)
             new_fname = fname.replace(
-                assignment + '_' + student + '_attempt_' + timestamp + '_', '')
-            if new_fname == '.txt':
-                new_fname = 'attempt_' + timestamp + new_fname
+                assignment + "_" + student + "_attempt_" + timestamp + "_", ""
+            )
+            if new_fname == ".txt":
+                new_fname = "attempt_" + timestamp + new_fname
             try:
-                os.rename(student + '/' + fname, student + '/' + new_fname)
+                os.rename(student + "/" + fname, student + "/" + new_fname)
             except FileExistsError:
-                if not os.path.exists(student + '/' + timestamp):
-                    os.mkdir(student + '/' + timestamp)
+                if not os.path.exists(student + "/" + timestamp):
+                    os.mkdir(student + "/" + timestamp)
                     timestamp_dict[student] = timestamp
-                    print(f'Additional attempt for {student}: {timestamp}')
+                    print(f"Additional attempt for {student}: {timestamp}")
                 try:
-                    os.rename(student + '/' + fname, student + '/' + timestamp + '/' + new_fname)
+                    os.rename(
+                        student + "/" + fname,
+                        student + "/" + timestamp + "/" + new_fname,
+                    )
                 except FileExistsError:
-                    print(f'ATTENTION REQUIRED: {student}: {timestamp}')
+                    print(f"ATTENTION REQUIRED: {student}: {timestamp}")
             student_files[student].append(new_fname)
             # print(f'Student: {student}, file: {new_fname}')
-            if new_fname[-4:] == '.zip':  # Zip file inside original zip file
-                processed = process_zipfile(student + '/' + new_fname[:-4],
-                                student + '/' + new_fname)
+            if new_fname[-4:] == ".zip":  # Zip file inside original zip file
+                processed = process_zipfile(
+                    student + "/" + new_fname[:-4], student + "/" + new_fname
+                )
                 if processed:
-                    os.remove(student + '/' + new_fname)  # Remove inner zip
+                    os.remove(student + "/" + new_fname)  # Remove inner zip
             file_count += 1
     for student in student_list:
         try:
             copy_feedback_file(student, feedback_template, args.feedback)
         except Exception as err:
-            print(f'\t{err}: \n\tCould not copy feedback for {student}')
+            print(f"\t{err}: \n\tCould not copy feedback for {student}")
 
     # Create text file with students who submitted assignment
-    student_file_name = 'students-' + assignment.replace(' ', '') + '.txt'
+    student_file_name = "students-" + assignment.replace(" ", "") + ".txt"
     if args.studentroster:
-        sr_filename = os.path.join('..', args.studentroster)
+        sr_filename = os.path.join("..", args.studentroster)
         all_student_list = get_all_students(sr_filename)
     else:
         all_student_list = []
     counter = 0
-    with open(student_file_name, 'w') as student_file:
+    with open(student_file_name, "w") as student_file:
         current_dt = datetime.now()
-        prefix = prefix.rstrip('-')
-        header = assignment + ' - ' + prefix \
-                 + f' ({current_dt.strftime("%m-%d-%Y-%H-%M")})'
-        student_file.write(f'{header}\n')
-        student_file.write((len(header) * '-') + '\n')
+        prefix = prefix.rstrip("-")
+        header = (
+            assignment + " - " + prefix + f' ({current_dt.strftime("%m-%d-%Y-%H-%M")})'
+        )
+        student_file.write(f"{header}\n")
+        student_file.write((len(header) * "-") + "\n")
         student_list.sort()
         for student in student_list:
             if counter % 10 == 0 and counter != 0:
-                student_file.write('-\n')
+                student_file.write("-\n")
             if earlygrade:
                 if earlygrade > get_dt_submitted(student, timestamp_dict):
-                    student_file.write(f'{student} (EG)\n')
+                    student_file.write(f"{student} (EG)\n")
                 else:
-                    student_file.write(f'{student}\n')
+                    student_file.write(f"{student}\n")
             else:
                 try:
                     student_file.write(
-                        f'{get_dt_submitted_str(student, timestamp_dict)}: {student}\n')
+                        f"{get_dt_submitted_str(student, timestamp_dict)}: {student}\n"
+                    )
                 except ValueError:
-                    student_file.write(
-                        f'XXX XXX XX, XX:XX XX: {student}\n')
+                    student_file.write(f"XXX XXX XX, XX:XX XX: {student}\n")
             if student in all_student_list:
                 all_student_list.remove(student)
             counter += 1
 
         if len(all_student_list) > 0:
-            student_file.write(f'\n\nStudents without assignment:{len(all_student_list):4}\n')
-            student_file.write('--------------------------------\n')
+            student_file.write(
+                f"\n\nStudents without assignment:{len(all_student_list):4}\n"
+            )
+            student_file.write("--------------------------------\n")
             for student in all_student_list:
-                student_file.write(f'{student}\n')
+                student_file.write(f"{student}\n")
 
-    print(f'Assignment: {assignment}')
+    print(f"Assignment: {assignment}")
     print(f"{file_count} files extracted for {len(student_list)} students")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
